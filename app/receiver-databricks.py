@@ -1,184 +1,40 @@
 # Databricks notebook source
-# MAGIC %pip install azure-eventhub
-
-# COMMAND ----------
-
-# MAGIC %md
-# MAGIC <code> 
-# MAGIC restart the kernel:
-# MAGIC </code>
-
-# COMMAND ----------
-
-dbutils.library.restartPython()
-
-# COMMAND ----------
-
-# MAGIC %md
-# MAGIC <code>
-# MAGIC import libs:
-# MAGIC </code>
-
-# COMMAND ----------
-
 from pyspark.sql import SparkSession
-from pyspark.sql.functions import from_json
-from pyspark.sql.types import StructType, StructField, StringType, LongType, IntegerType
-from azure.eventhub import EventHubConsumerClient
+from pyspark.sql.functions import col, from_json
+from pyspark.sql.types import StructType, StructField, StringType
+from pyspark.sql import SparkSession
+from pyspark.sql.functions import col, split, expr
+from pyspark.sql.functions import col, unbase64
 
-# COMMAND ----------
 
-
-
-# COMMAND ----------
-
-namespace = "regulargazelleahee"
-accessKeyName = "RootManageSharedAccessKey"
-accessKey = "WAaU90f+XdiB/SrFEO4+0p8VfNQv8PP40+AEhFAwLTc="
-eventHubName = "logs-handler"
 connection_string = f"Endpoint=sb://{namespace}.servicebus.windows.net/;SharedAccessKeyName={accessKeyName};SharedAccessKey={accessKey};EntityPath={eventHubName}"
-starting_position = "-1"  # Start reading from the latest available offset
+ehConf={}
+ehConf['eventhubs.connectionString'] = sc._jvm.org.apache.spark.eventhubs.EventHubsUtils.encrypt(connection_string)
 
-# COMMAND ----------
+spark = SparkSession.builder.appName("EventHubsExample").getOrCreate()
 
-# MAGIC %md
-# MAGIC <code>
-# MAGIC Init spark session:
-# MAGIC </code>
+# Read from Event Hubs
+raw_df = spark \
+  .readStream \
+  .format("eventhubs") \
+  .options(**ehConf) \
+  .load()
 
-# COMMAND ----------
+# Convert the value column from binary to string
+raw_df = raw_df.withColumn("value", raw_df["body"].cast("string"))
 
-# Create a SparkSession
-spark = SparkSession.builder \
-    .appName("EventHubsStreaming") \
-    .getOrCreate()
+# Split the data using the "|" delimiter
+split_columns = split(raw_df["value"], "\\|")
+split_df = raw_df.withColumn("split_data", split_columns)
 
-# COMMAND ----------
+# Select the split columns and apply the defined schema
+parsed_df = split_df.selectExpr("split_data[0] as timestamp", "split_data[1] as log_level", "split_data[2] as request_id", "split_data[3] as session_id", "split_data[4] as user_id", "split_data[5] as action", "split_data[6] as http_method", "split_data[7] as url", "split_data[8] as referrer_url", "split_data[9] as ip_address", "split_data[10] as user_agent", "split_data[11] as response_time", "split_data[12] as product_id", "split_data[13] as cart_size", "split_data[14] as checkout_status", "split_data[15] as token", "split_data[16] as auth_method", "split_data[17] as auth_level", "split_data[18] as correlation_id", "split_data[19] as server_ip", "split_data[20] as port", "split_data[21] as protocol", "split_data[22] as status_and_detail")
 
-# MAGIC %md
-# MAGIC <code>
-# MAGIC StructType:
-# MAGIC </code>
-
-# COMMAND ----------
-
-log_schema = StructType([
-    StructField("timestamp", LongType(), True),
-    StructField("log_level", StringType(), True),
-    StructField("request_id", StringType(), True),
-    StructField("session_id", StringType(), True),
-    StructField("user_id", StringType(), True),
-    StructField("action", StringType(), True),
-    StructField("http_method", StringType(), True),
-    StructField("url", StringType(), True),
-    StructField("referrer_url", StringType(), True),
-    StructField("ip_address", StringType(), True),
-    StructField("user_agent", StringType(), True),
-    StructField("response_time", StringType(), True),
-    StructField("product_id", StringType(), True),
-    StructField("cart_size", IntegerType(), True),
-    StructField("checkout_status", StringType(), True),
-    StructField("token", StringType(), True),
-    StructField("auth_method", StringType(), True),
-    StructField("auth_level", StringType(), True),
-    StructField("correlation_id", StringType(), True),
-    StructField("server_ip", StringType(), True),
-    StructField("port", IntegerType(), True),
-    StructField("protocol", StringType(), True),
-    StructField("status_and_detail", StringType(), True)
-])
-
-# COMMAND ----------
-
-# MAGIC %md
-# MAGIC <code> 
-# MAGIC read stream with spark streaming:
-# MAGIC </code>
-
-# COMMAND ----------
-
-def readStream(read_options):
-    df = spark \
-    .readStream \
-    .format("eventhubs") \
-    .options(**read_options) \
-    .load()
-    return df
-
-# COMMAND ----------
-
-# MAGIC %md
-# MAGIC <code>
-# MAGIC Define the streaming read options:
-# MAGIC </code>
-
-# COMMAND ----------
-
-read_options = {
-    "eventhubs.connectionString": connection_string,
-    "eventhubs.consumerGroup": "$Default",
-    "eventhubs.startingPosition": starting_position
-}
-
-# COMMAND ----------
-
-# MAGIC %md
-# MAGIC <code>
-# MAGIC  Convert the value column from binary to string
-# MAGIC </code>
-
-# COMMAND ----------
-
-df = readStream(read_options)
-df = df.withColumn("value", df["body"].cast("string"))
-
-# COMMAND ----------
-
-# MAGIC %md
-# MAGIC <code>
-# MAGIC create schema to struct the data with structtype:
-# MAGIC </code>
-
-# COMMAND ----------
-
-df = df.withColumn("data", from_json(df["value"], log_schema))
-
-# COMMAND ----------
-
-# MAGIC %md
-# MAGIC <code>Extract the fields from the JSON data</code>
-
-# COMMAND ----------
-
-df = df.select("data.*")
-
-# COMMAND ----------
-
-# MAGIC %md
-# MAGIC <code>Wait for the streaming query to finish:</code>
-
-# COMMAND ----------
-
-df.writeStream \
+# Write the parsed DataFrame to the console sink
+parsed_df.writeStream \
     .outputMode("append") \
     .format("console") \
     .start()
-spark.streams.awaitAnyTermination()
 
-# COMMAND ----------
-
-# MAGIC %md
-# MAGIC <code>
-# MAGIC Perform further data processing or analysis on the streaming DataFrame:
-# MAGIC </code>
-
-# COMMAND ----------
-
-#def on_event(partition_context, event):
-    # Process the received event
-#    print("Received event:", event.body_as_str())
-
-#consumer_client = EventHubConsumerClient.from_connection_string(connection_string, consumer_group="$Default")
-
-#with consumer_client:
-#    consumer_client.receive(on_event=on_event, eventhub_name=eventHubName)
+display(parsed_df)
+#query.awaitTermination()

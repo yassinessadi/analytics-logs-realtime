@@ -21,6 +21,9 @@ from pyspark.sql.functions import col, unbase64,date_format
 # COMMAND ----------
 
 
+#-------------------------------------------------------#
+#  this credentials will expire soon replace with yours #
+#-------------------------------------------------------#
 namespace = "regulargazelleseventhub"
 accessKeyName = "RootManageSharedAccessKey"
 accessKey = "s4ps7/DF/iv+Vy/gn699+Gaya2fzyfmCL+AEhBu86Z0="
@@ -29,12 +32,8 @@ starting_position = -1
 
 connection_string = f"Endpoint=sb://{namespace}.servicebus.windows.net/;SharedAccessKeyName={accessKeyName};SharedAccessKey={accessKey};EntityPath={eventHubName}"
 
-#-------------------------------------#
-# event hub config to read more check #
-#--------------------------------------#
-
-
 #------------------------------------------------------------------------------------------------------------#
+# event hub config to read more check -----------------------------------------------------------------------#
 # https://github.com/Azure/azure-event-hubs-spark/blob/master/docs/PySpark/structured-streaming-pyspark.md   #
 #------------------------------------------------------------------------------------------------------------#
 
@@ -46,10 +45,10 @@ ehConf = {
 #---------------------------------------------------------------------------------------------------------#
 
 ehConf['eventhubs.connectionString'] = sc._jvm.org.apache.spark.eventhubs.EventHubsUtils.encrypt(connection_string)
+
 #--------------------#
 # init spark session #
 #--------------------#
-
 spark = SparkSession.builder.appName("EventHubslogshandler").getOrCreate()
 
 # COMMAND ----------

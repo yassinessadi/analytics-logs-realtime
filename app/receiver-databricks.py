@@ -20,7 +20,6 @@ from pyspark.sql.functions import col, unbase64,date_format
 
 # COMMAND ----------
 
-
 #-------------------------------------------------------#
 #  this credentials will expire soon replace with yours #
 #-------------------------------------------------------#
@@ -46,13 +45,18 @@ ehConf = {
 
 ehConf['eventhubs.connectionString'] = sc._jvm.org.apache.spark.eventhubs.EventHubsUtils.encrypt(connection_string)
 
-#--------------------#
-# init spark session #
-#--------------------#
-spark = SparkSession.builder.appName("EventHubslogshandler").getOrCreate()
 
 # COMMAND ----------
 
+#-----------------------------------------#
+# init spark session andcreate hive table #
+#-----------------------------------------#
+spark = SparkSession.builder.appName("EventHubslogshandler").getOrCreate()
+database_name = 'HAEE_db'
+
+spark.sql(f"CREATE DATABASE IF NOT EXISTS {database_name}")
+
+spark.sql(f"USE {database_name}")
 
 #----------------------#
 # Read from Event Hubs #
@@ -90,6 +94,7 @@ select_trasnformed_df = parsed_df.select(
     split(col("ip_address"), ":").getItem(1).alias("ip_address"),
     split(col("server_ip"), ":").getItem(1).alias("server_ip"),
     col("session_id").alias("session_id"),
+    col("http_method").alias("http_method"),
     regexp_replace(col("url").alias("url"),"/","").alias("page_name"),
     split(col("Referrer_url"), "\\.").getItem(1).alias("Referrer_url"),
     split(col("cart_size"), ":").getItem(1).alias("cart_size"),
@@ -129,7 +134,26 @@ select_trasnformed_df = select_trasnformed_df.filter("timestamp IS NOT NULL and 
 #     .format("console") \
 #     .start()
 
+
+
+#------------------------------------#
+#        write streams in hive       #
+#------------------------------------#
+
+hive_table_name = 'haee_logs'
+table_location = '/mnt/former_salamenders/logs'
+select_trasnformed_df.writeStream \
+  .format("delta") \
+  .outputMode("append") \
+  .option("checkpointLocation", "/mnt/checkpoints/dir") \
+  .toTable("haee_logs")
+
 #--------------------#
 # display the output #
 #--------------------#
 display(select_trasnformed_df)
+   
+
+# COMMAND ----------
+
+

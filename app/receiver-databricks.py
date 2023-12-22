@@ -141,7 +141,7 @@ select_trasnformed_df = select_trasnformed_df.filter("timestamp IS NOT NULL and 
 #------------------------------------#
 
 hive_table_name = 'haee_logs'
-table_location = '/mnt/former_salamenders/logs'
+table_location = '/mnt/haee_workspace/logs'
 select_trasnformed_df.writeStream \
   .format("delta") \
   .outputMode("append") \

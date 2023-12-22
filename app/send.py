@@ -2,12 +2,21 @@ import random
 import time
 from datetime import datetime
 import json
+from pathlib import Path
+from dotenv import load_dotenv
+import os
+env_path = Path('.') / '.env'
+load_dotenv(env_path) 
 
 from azure.eventhub import EventHubProducerClient, EventData
 
 # Replace the following values with your Event Hubs namespace connection string and event hub name
-eventhub_namespace_connection_str = "Endpoint=sb://regulargazelleseventhub.servicebus.windows.net/;SharedAccessKeyName=RootManageSharedAccessKey;SharedAccessKey=x85GsEbtNxRbj++fnEIHCU5g3X1JKmd/0+AEhAC+qkU="
-eventhub_name = "handler-logs"
+# -------------------------------------?
+#  credentials to connect to eventhub  ?
+# ------------------------------------ ?
+
+eventhub_namespace_connection_str = os.getenv("Connection_string_primary_key")
+eventhub_name = os.getenv("evenhuthub_name")
 
 try:
     # Create an Event Hub producer client

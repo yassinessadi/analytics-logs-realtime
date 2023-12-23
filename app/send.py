@@ -11,6 +11,7 @@ load_dotenv(env_path)
 from azure.eventhub import EventHubProducerClient, EventData
 
 # Replace the following values with your Event Hubs namespace connection string and event hub name
+
 # -------------------------------------?
 #  credentials to connect to eventhub  ?
 # ------------------------------------ ?
@@ -219,9 +220,8 @@ while True:
         # Create a batch and add the event data to it
         event_batch = producer_client.create_batch()
         event_batch.add(event_data)
-
         # Send the batch to the Event Hub
         producer_client.send_batch(event_batch)
-
         print(log_entry_json)
-        time.sleep(random.uniform(0.2, 1.0))  # simulate delay between log entries
+        # simulate delay between log entries
+        time.sleep(random.uniform(0.2, 1.0)) 
